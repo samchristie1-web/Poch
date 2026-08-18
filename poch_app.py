@@ -211,6 +211,47 @@ with tab_community:
         "ask it to search FPL forums/sites), then Poch's Community senator "
         "will factor it into its verdicts."
     )
+
+    with st.expander("📋 Bulk paste (add several signals at once)", expanded=True):
+        st.caption(
+            "One signal per line, pipe-separated: "
+            "`type | player or 'Captaincy' | summary | sources (optional, default 1)`\n\n"
+            "Valid types: must_have, hidden_gem, enabler, gw_strategy, avoid"
+        )
+        st.code(
+            "must_have | Haaland | Nailed on essential per multiple sites | 5\n"
+            "hidden_gem | Anderson | Low ownership, strong underlying stats | 2\n"
+            "gw_strategy | Captaincy | Consensus leaning Haaland this week | 3",
+            language=None,
+        )
+        bulk_text = st.text_area("Paste signals here", height=140, key="bulk_signals")
+        if st.button("Add all"):
+            lines = [ln.strip() for ln in bulk_text.splitlines() if ln.strip()]
+            added, errors = [], []
+            for i, line in enumerate(lines, start=1):
+                parts = [p.strip() for p in line.split("|")]
+                if len(parts) < 3:
+                    errors.append(f"Line {i}: needs at least type | subject | summary — skipped")
+                    continue
+                sig_type, subject, summary = parts[0], parts[1], parts[2]
+                valid_types = {"must_have", "hidden_gem", "enabler", "gw_strategy", "avoid"}
+                if sig_type not in valid_types:
+                    errors.append(f"Line {i}: unknown type '{sig_type}' — skipped")
+                    continue
+                source_count = 1
+                if len(parts) >= 4 and parts[3].isdigit():
+                    source_count = int(parts[3])
+                added.append(CommunitySignal(sig_type, subject, summary, source_count=source_count))
+            if added:
+                ingest_signals(kb, added)
+                st.success(f"Added {len(added)} signal(s).")
+            if errors:
+                st.warning("Some lines were skipped:\n" + "\n".join(f"- {e}" for e in errors))
+            if not added and not errors:
+                st.info("Nothing to add — paste some lines first.")
+
+    st.divider()
+    st.caption("Or add one signal at a time:")
     with st.form("add_signal"):
         sig_type = st.selectbox(
             "Signal type", ["must_have", "hidden_gem", "enabler", "gw_strategy", "avoid"]
